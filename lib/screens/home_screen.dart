@@ -1,59 +1,24 @@
 import 'package:flutter/material.dart';
 
+import '../services/starkind_state.dart';
 import '../widgets/daily_message_card.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  int _cardIndex = 0;
-
-  final List<_DailyCardData> _sampleCards = const [
-    _DailyCardData(
-      message:
-          'You are allowed to move slowly today. Kind steps still create bright paths.',
-      zodiacHint: 'Taurus energy: build steady comfort and trust your rhythm.',
-      luckyColor: 'Blush Peach',
-      dateText: 'TODAY',
-    ),
-    _DailyCardData(
-      message:
-          'A soft heart is a strength. Share one honest word and warmth will return to you.',
-      zodiacHint: 'Cancer mood: nurture your inner space before the outside noise.',
-      luckyColor: 'Mist Blue',
-      dateText: 'TODAY',
-    ),
-    _DailyCardData(
-      message:
-          'Keep only what feels true. Simplicity can make your day feel magical.',
-      zodiacHint: 'Virgo tone: gentle clarity brings peaceful momentum.',
-      luckyColor: 'Moonlit Sage',
-      dateText: 'TODAY',
-    ),
-  ];
-
-  void _refreshCard() {
-    setState(() {
-      _cardIndex = (_cardIndex + 1) % _sampleCards.length;
-    });
-  }
-
-  void _saveCard() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Saved to favorites (mock for now).'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final card = _sampleCards[_cardIndex];
+    final state = StarKindScope.of(context);
+    final card = state.currentMessage;
+
+    final messageText = card?.message ??
+        'Set your birthday in Profile to receive your daily kindness card.';
+    final hintText = card?.zodiacHint ??
+        'Your zodiac hint will appear after profile setup.';
+    final luckyColor = card?.luckyColor ?? 'Soft Pearl';
+    final dateText = card == null
+        ? 'TODAY'
+        : '${card.date.year}-${card.date.month.toString().padLeft(2, '0')}-${card.date.day.toString().padLeft(2, '0')}';
 
     return SafeArea(
       child: Stack(
@@ -85,10 +50,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 26),
                         DailyMessageCard(
-                          message: card.message,
-                          zodiacHint: card.zodiacHint,
-                          luckyColor: card.luckyColor,
-                          dateText: card.dateText,
+                          message: messageText,
+                          zodiacHint: hintText,
+                          luckyColor: luckyColor,
+                          dateText: dateText,
                         ),
                         const SizedBox(height: 20),
                         Center(
@@ -98,12 +63,26 @@ class _HomeScreenState extends State<HomeScreen> {
                             alignment: WrapAlignment.center,
                             children: [
                               FilledButton.icon(
-                                onPressed: _saveCard,
-                                icon: const Icon(Icons.bookmark_add_rounded),
-                                label: const Text('Save'),
+                                onPressed: () {
+                                  final saved = state.saveCurrentMessage();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(saved
+                                          ? 'Saved to favorites.'
+                                          : 'Already saved for today.'),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                },
+                                icon: Icon(state.isCurrentMessageSaved
+                                    ? Icons.bookmark_rounded
+                                    : Icons.bookmark_add_rounded),
+                                label: Text(
+                                  state.isCurrentMessageSaved ? 'Saved' : 'Save',
+                                ),
                               ),
                               OutlinedButton.icon(
-                                onPressed: _refreshCard,
+                                onPressed: state.refreshDailyMessage,
                                 icon: const Icon(Icons.refresh_rounded),
                                 label: const Text('Refresh'),
                               ),
@@ -180,18 +159,4 @@ class _BlurBubble extends StatelessWidget {
       ),
     );
   }
-}
-
-class _DailyCardData {
-  const _DailyCardData({
-    required this.message,
-    required this.zodiacHint,
-    required this.luckyColor,
-    required this.dateText,
-  });
-
-  final String message;
-  final String zodiacHint;
-  final String luckyColor;
-  final String dateText;
 }

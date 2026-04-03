@@ -3,13 +3,27 @@ import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/saved_screen.dart';
+import 'services/starkind_state.dart';
 
 void main() {
   runApp(const StarKindApp());
 }
 
-class StarKindApp extends StatelessWidget {
+class StarKindApp extends StatefulWidget {
   const StarKindApp({super.key});
+
+  @override
+  State<StarKindApp> createState() => _StarKindAppState();
+}
+
+class _StarKindAppState extends State<StarKindApp> {
+  final StarKindState _state = StarKindState();
+
+  @override
+  void dispose() {
+    _state.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +31,10 @@ class StarKindApp extends StatelessWidget {
       title: 'StarKind',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
-      home: const AppShell(),
+      home: StarKindScope(
+        notifier: _state,
+        child: const AppShell(),
+      ),
     );
   }
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../services/zodiac_service.dart';
+import '../services/starkind_state.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -10,12 +10,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final ZodiacService _zodiacService = ZodiacService();
-
-  DateTime? _birthday;
-  TimeOfDay _notificationTime = const TimeOfDay(hour: 9, minute: 0);
-  String _selectedTone = 'Gentle';
-
   static const List<String> _tones = [
     'Gentle',
     'Healing',
@@ -24,31 +18,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
   ];
 
   Future<void> _pickBirthday() async {
+    final state = StarKindScope.of(context);
+    final currentBirthday = state.profile.birthday;
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
       firstDate: DateTime(1900),
       lastDate: now,
-      initialDate: _birthday ?? DateTime(now.year - 20, 1, 1),
+      initialDate: currentBirthday ?? DateTime(now.year - 20, 1, 1),
     );
 
     if (picked != null) {
-      setState(() {
-        _birthday = picked;
-      });
+      state.setBirthday(picked);
     }
   }
 
   Future<void> _pickTime() async {
+    final state = StarKindScope.of(context);
+    final currentTime = TimeOfDay(
+      hour: state.profile.notificationHour,
+      minute: state.profile.notificationMinute,
+    );
     final picked = await showTimePicker(
       context: context,
-      initialTime: _notificationTime,
+      initialTime: currentTime,
     );
 
     if (picked != null) {
-      setState(() {
-        _notificationTime = picked;
-      });
+      state.setNotificationTime(picked);
     }
   }
 
@@ -63,9 +60,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final zodiacSign = _birthday == null
-        ? 'Unknown'
-        : _zodiacService.getZodiacSign(_birthday!);
+    final state = StarKindScope.of(context);
+    final profile = state.profile;
+    final zodiacSign = profile.zodiacSign;
+    final notificationTime = TimeOfDay(
+      hour: profile.notificationHour,
+      minute: profile.notificationMinute,
+    );
 
     return SafeArea(
       child: ListView(
@@ -100,7 +101,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _formatDate(_birthday),
+                    _formatDate(profile.birthday),
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   const SizedBox(height: 12),
@@ -159,7 +160,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _notificationTime.format(context),
+                    notificationTime.format(context),
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   const SizedBox(height: 12),
@@ -193,11 +194,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         .map(
                           (tone) => ChoiceChip(
                             label: Text(tone),
-                            selected: _selectedTone == tone,
+                            selected: profile.preferredTone == tone,
                             onSelected: (_) {
-                              setState(() {
-                                _selectedTone = tone;
-                              });
+                              state.setPreferredTone(tone);
                             },
                           ),
                         )
