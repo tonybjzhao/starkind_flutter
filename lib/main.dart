@@ -20,6 +20,12 @@ class _StarKindAppState extends State<StarKindApp> {
   final StarKindState _state = StarKindState();
 
   @override
+  void initState() {
+    super.initState();
+    _state.initialize();
+  }
+
+  @override
   void dispose() {
     _state.dispose();
     super.dispose();

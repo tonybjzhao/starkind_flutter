@@ -1,6 +1,8 @@
 import 'dart:collection';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/daily_message.dart';
 import '../models/user_profile.dart';
@@ -19,6 +21,9 @@ class StarKindState extends ChangeNotifier {
   final MessageService _messageService;
   final ZodiacService _zodiacService;
 
+  static const String _profileKey = 'profile';
+  static const String _savedMessagesKey = 'saved_messages';
+
   UserProfile _profile = UserProfile.initial();
   DailyMessage? _currentMessage;
   final List<DailyMessage> _savedMessages = [];
@@ -35,17 +40,41 @@ class StarKindState extends ChangeNotifier {
     return _savedMessages.any((item) => item.id == current.id);
   }
 
+  Future<void> initialize() async {
+    final prefs = await SharedPreferences.getInstance();
+    final profileJson = prefs.getString(_profileKey);
+    final savedJson = prefs.getStringList(_savedMessagesKey) ?? [];
+
+    if (profileJson != null && profileJson.isNotEmpty) {
+      final decoded = jsonDecode(profileJson) as Map<String, dynamic>;
+      _profile = UserProfile.fromJson(decoded);
+    }
+
+    _savedMessages
+      ..clear()
+      ..addAll(
+        savedJson.map((item) {
+          final decoded = jsonDecode(item) as Map<String, dynamic>;
+          return DailyMessage.fromJson(decoded);
+        }),
+      );
+
+    refreshDailyMessage();
+  }
+
   void setBirthday(DateTime birthday) {
     final zodiac = _zodiacService.getZodiacSign(birthday);
     _profile = _profile.copyWith(
       birthday: birthday,
       zodiacSign: zodiac,
     );
+    _saveProfile();
     refreshDailyMessage();
   }
 
   void setPreferredTone(String tone) {
     _profile = _profile.copyWith(preferredTone: tone);
+    _saveProfile();
     refreshDailyMessage();
   }
 
@@ -54,6 +83,7 @@ class StarKindState extends ChangeNotifier {
       notificationHour: time.hour,
       notificationMinute: time.minute,
     );
+    _saveProfile();
     notifyListeners();
   }
 
@@ -79,13 +109,28 @@ class StarKindState extends ChangeNotifier {
     }
 
     _savedMessages.insert(0, current);
+    _saveSavedMessages();
     notifyListeners();
     return true;
   }
 
   void removeSavedMessage(String messageId) {
     _savedMessages.removeWhere((item) => item.id == messageId);
+    _saveSavedMessages();
     notifyListeners();
+  }
+
+  Future<void> _saveProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_profileKey, jsonEncode(_profile.toJson()));
+  }
+
+  Future<void> _saveSavedMessages() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = _savedMessages
+        .map((message) => jsonEncode(message.toJson()))
+        .toList();
+    await prefs.setStringList(_savedMessagesKey, encoded);
   }
 }
 
