@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,19 +8,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/daily_message.dart';
 import '../models/user_profile.dart';
 import 'message_service.dart';
+import 'notification_service.dart';
 import 'zodiac_service.dart';
 
 class StarKindState extends ChangeNotifier {
   StarKindState({
     MessageService? messageService,
     ZodiacService? zodiacService,
+    NotificationService? notificationService,
   })  : _messageService = messageService ?? MessageService(),
-        _zodiacService = zodiacService ?? ZodiacService() {
+        _zodiacService = zodiacService ?? ZodiacService(),
+        _notificationService = notificationService ?? NotificationService() {
     refreshDailyMessage();
   }
 
   final MessageService _messageService;
   final ZodiacService _zodiacService;
+  final NotificationService _notificationService;
 
   static const String _profileKey = 'profile';
   static const String _savedMessagesKey = 'saved_messages';
@@ -27,6 +32,7 @@ class StarKindState extends ChangeNotifier {
   UserProfile _profile = UserProfile.initial();
   DailyMessage? _currentMessage;
   final List<DailyMessage> _savedMessages = [];
+  bool _notificationsReady = false;
 
   UserProfile get profile => _profile;
   DailyMessage? get currentMessage => _currentMessage;
@@ -41,6 +47,10 @@ class StarKindState extends ChangeNotifier {
   }
 
   Future<void> initialize() async {
+    await _notificationService.initialize();
+    await _notificationService.requestPermissions();
+    _notificationsReady = true;
+
     final prefs = await SharedPreferences.getInstance();
     final profileJson = prefs.getString(_profileKey);
     final savedJson = prefs.getStringList(_savedMessagesKey) ?? [];
@@ -70,12 +80,14 @@ class StarKindState extends ChangeNotifier {
     );
     _saveProfile();
     refreshDailyMessage();
+    unawaited(_rescheduleNotification());
   }
 
   void setPreferredTone(String tone) {
     _profile = _profile.copyWith(preferredTone: tone);
     _saveProfile();
     refreshDailyMessage();
+    unawaited(_rescheduleNotification());
   }
 
   void setNotificationTime(TimeOfDay time) {
@@ -85,6 +97,7 @@ class StarKindState extends ChangeNotifier {
     );
     _saveProfile();
     notifyListeners();
+    unawaited(_rescheduleNotification());
   }
 
   void refreshDailyMessage() {
@@ -95,6 +108,7 @@ class StarKindState extends ChangeNotifier {
       preferredTone: _profile.preferredTone,
     );
     notifyListeners();
+    unawaited(_rescheduleNotification());
   }
 
   bool saveCurrentMessage() {
@@ -131,6 +145,21 @@ class StarKindState extends ChangeNotifier {
         .map((message) => jsonEncode(message.toJson()))
         .toList();
     await prefs.setStringList(_savedMessagesKey, encoded);
+  }
+
+  Future<void> _rescheduleNotification() async {
+    if (!_notificationsReady) {
+      return;
+    }
+
+    final body = _currentMessage?.message ??
+        'Your gentle StarKind message is ready for today.';
+
+    await _notificationService.scheduleDailyMessageNotification(
+      hour: _profile.notificationHour,
+      minute: _profile.notificationMinute,
+      message: body,
+    );
   }
 }
 
