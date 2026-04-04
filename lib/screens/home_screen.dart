@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/daily_state.dart';
 import '../services/starkind_state.dart';
 import '../widgets/daily_message_card.dart';
 
@@ -11,6 +12,7 @@ class HomeScreen extends StatelessWidget {
     final state = StarKindScope.of(context);
     final card = state.currentMessage;
     final isRevealed = state.hasRevealedToday;
+    final selectedState = state.selectedDailyState;
 
     final messageText = card?.message ??
         'Set your birthday in Profile to receive your daily kindness card.';
@@ -48,6 +50,12 @@ class HomeScreen extends StatelessWidget {
                               ),
                         ),
                         const SizedBox(height: 26),
+                        _DailyStateSelector(
+                          selected: selectedState,
+                          enabled: !isRevealed,
+                          onSelected: state.selectDailyState,
+                        ),
+                        const SizedBox(height: 14),
                         AnimatedSwitcher(
                           duration: const Duration(milliseconds: 260),
                           switchInCurve: Curves.easeOut,
@@ -73,7 +81,19 @@ class HomeScreen extends StatelessWidget {
                               : _RevealPlaceholderCard(
                                   key: const ValueKey('hidden-card'),
                                   dateText: dateText,
-                                  onTap: state.revealTodayMessage,
+                                  hasSelectedState: state.canRevealToday,
+                                  selectedStateLabel: selectedState?.label,
+                                  onTap: () {
+                                    final revealed = state.revealTodayMessage();
+                                    if (!revealed) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Select how you feel first.'),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    }
+                                  },
                                 ),
                         ),
                         const SizedBox(height: 20),
@@ -130,10 +150,14 @@ class _RevealPlaceholderCard extends StatelessWidget {
   const _RevealPlaceholderCard({
     super.key,
     required this.dateText,
+    required this.hasSelectedState,
+    required this.selectedStateLabel,
     required this.onTap,
   });
 
   final String dateText;
+  final bool hasSelectedState;
+  final String? selectedStateLabel;
   final VoidCallback onTap;
 
   @override
@@ -157,7 +181,9 @@ class _RevealPlaceholderCard extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Tap to reveal your message',
+                hasSelectedState
+                    ? 'Tap to reveal your message'
+                    : 'Choose your feeling first',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       color: const Color(0xFF5F4F59),
                       fontWeight: FontWeight.w700,
@@ -165,13 +191,72 @@ class _RevealPlaceholderCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Take a breath, then open today\'s gentle card.',
+                hasSelectedState
+                    ? 'Take a breath, then open today\'s gentle card.'
+                    : 'Pick your current state to tune today\'s message.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: const Color(0xFF7B6A73),
                     ),
               ),
+              if (selectedStateLabel != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Today\'s state: $selectedStateLabel',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: const Color(0xFF6F5E5E),
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DailyStateSelector extends StatelessWidget {
+  const _DailyStateSelector({
+    required this.selected,
+    required this.enabled,
+    required this.onSelected,
+  });
+
+  final DailyState? selected;
+  final bool enabled;
+  final ValueChanged<DailyState> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'How are you feeling today?',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF5F4F59),
+                  ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: DailyState.values
+                  .map(
+                    (mood) => ChoiceChip(
+                      label: Text(mood.label),
+                      selected: selected == mood,
+                      onSelected: enabled ? (_) => onSelected(mood) : null,
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
         ),
       ),
     );

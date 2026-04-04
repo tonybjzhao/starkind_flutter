@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/daily_message.dart';
 import '../models/daily_reveal_record.dart';
+import '../models/daily_state.dart';
 import '../models/user_profile.dart';
 import 'message_service.dart';
 import 'notification_service.dart';
@@ -41,6 +42,9 @@ class StarKindState extends ChangeNotifier {
   UserProfile get profile => _profile;
   DailyMessage? get currentMessage => _currentMessage;
   bool get hasRevealedToday => _dailyRevealRecord.hasRevealedToday;
+    DailyState? get selectedDailyState =>
+      DailyStateX.fromKey(_dailyRevealRecord.selectedStateKey);
+    bool get canRevealToday => selectedDailyState != null;
   String get todayDateText => _dailyRevealRecord.dateKey;
   UnmodifiableListView<DailyMessage> get savedMessages =>
       UnmodifiableListView(_savedMessages);
@@ -113,29 +117,65 @@ class StarKindState extends ChangeNotifier {
   }
 
   void refreshDailyMessage() {
-    final generated = _generateTodayMessage();
-    _currentMessage = generated;
-    _dailyRevealRecord = DailyRevealRecord(
-      dateKey: _todayKey(),
-      hasRevealedToday: false,
-      messageId: generated.id,
-      message: generated.message,
-      zodiacHint: generated.zodiacHint,
-      luckyColor: generated.luckyColor,
-    );
+    final selected = selectedDailyState;
+    if (selected == null) {
+      _currentMessage = null;
+      _dailyRevealRecord = DailyRevealRecord.emptyFor(_todayKey());
+    } else {
+      final generated = _generateTodayMessage(selectedState: selected);
+      _currentMessage = generated;
+      _dailyRevealRecord = DailyRevealRecord(
+        dateKey: _todayKey(),
+        hasRevealedToday: false,
+        selectedStateKey: selected.key,
+        messageId: generated.id,
+        message: generated.message,
+        zodiacHint: generated.zodiacHint,
+        luckyColor: generated.luckyColor,
+      );
+    }
+
     unawaited(_saveDailyRevealRecord());
     notifyListeners();
     unawaited(_rescheduleNotification());
   }
 
-  void revealTodayMessage() {
+  void selectDailyState(DailyState selectedState) {
+    final todayKey = _todayKey();
+    if (_dailyRevealRecord.dateKey != todayKey) {
+      _dailyRevealRecord = DailyRevealRecord.emptyFor(todayKey);
+    }
+
     if (_dailyRevealRecord.hasRevealedToday) {
       return;
+    }
+
+    final generated = _generateTodayMessage(selectedState: selectedState);
+    _currentMessage = generated;
+    _dailyRevealRecord = DailyRevealRecord(
+      dateKey: todayKey,
+      hasRevealedToday: false,
+      selectedStateKey: selectedState.key,
+      messageId: generated.id,
+      message: generated.message,
+      zodiacHint: generated.zodiacHint,
+      luckyColor: generated.luckyColor,
+    );
+
+    unawaited(_saveDailyRevealRecord());
+    notifyListeners();
+    unawaited(_rescheduleNotification());
+  }
+
+  bool revealTodayMessage() {
+    if (_dailyRevealRecord.hasRevealedToday || !canRevealToday) {
+      return false;
     }
 
     _dailyRevealRecord = _dailyRevealRecord.copyWith(hasRevealedToday: true);
     unawaited(_saveDailyRevealRecord());
     notifyListeners();
+    return true;
   }
 
   bool saveCurrentMessage() {
@@ -199,13 +239,32 @@ class StarKindState extends ChangeNotifier {
 
   void _syncTodayRecordAndMessage({required bool notify}) {
     final todayKey = _todayKey();
-    final generated = _generateTodayMessage();
+    if (_dailyRevealRecord.dateKey != todayKey) {
+      _dailyRevealRecord = DailyRevealRecord.emptyFor(todayKey);
+    }
 
-    if (_dailyRevealRecord.dateKey != todayKey ||
-        _dailyRevealRecord.messageId.isEmpty) {
-      _dailyRevealRecord = DailyRevealRecord(
-        dateKey: todayKey,
+    final selected = selectedDailyState;
+    if (selected == null) {
+      _currentMessage = null;
+      _dailyRevealRecord = _dailyRevealRecord.copyWith(
         hasRevealedToday: false,
+        messageId: '',
+        message: '',
+        zodiacHint: '',
+        luckyColor: '',
+      );
+      unawaited(_saveDailyRevealRecord());
+      if (notify) {
+        notifyListeners();
+      }
+      return;
+    }
+
+    if (_dailyRevealRecord.messageId.isEmpty ||
+        !_dailyRevealRecord.hasRevealedToday) {
+      final generated = _generateTodayMessage(selectedState: selected);
+      _dailyRevealRecord = _dailyRevealRecord.copyWith(
+        selectedStateKey: selected.key,
         messageId: generated.id,
         message: generated.message,
         zodiacHint: generated.zodiacHint,
@@ -228,12 +287,13 @@ class StarKindState extends ChangeNotifier {
     }
   }
 
-  DailyMessage _generateTodayMessage() {
+  DailyMessage _generateTodayMessage({required DailyState selectedState}) {
     final now = DateTime.now();
     return _messageService.generateDailyMessage(
       date: DateTime(now.year, now.month, now.day),
       zodiacSign: _profile.zodiacSign,
       preferredTone: _profile.preferredTone,
+      selectedState: selectedState,
     );
   }
 

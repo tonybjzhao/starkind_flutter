@@ -2,6 +2,7 @@ class DailyRevealRecord {
   const DailyRevealRecord({
     required this.dateKey,
     required this.hasRevealedToday,
+    required this.selectedStateKey,
     required this.messageId,
     required this.message,
     required this.zodiacHint,
@@ -10,6 +11,7 @@ class DailyRevealRecord {
 
   final String dateKey;
   final bool hasRevealedToday;
+  final String selectedStateKey;
   final String messageId;
   final String message;
   final String zodiacHint;
@@ -19,6 +21,7 @@ class DailyRevealRecord {
     return DailyRevealRecord(
       dateKey: dateKey,
       hasRevealedToday: false,
+      selectedStateKey: '',
       messageId: '',
       message: '',
       zodiacHint: '',
@@ -29,6 +32,7 @@ class DailyRevealRecord {
   DailyRevealRecord copyWith({
     String? dateKey,
     bool? hasRevealedToday,
+    String? selectedStateKey,
     String? messageId,
     String? message,
     String? zodiacHint,
@@ -37,6 +41,7 @@ class DailyRevealRecord {
     return DailyRevealRecord(
       dateKey: dateKey ?? this.dateKey,
       hasRevealedToday: hasRevealedToday ?? this.hasRevealedToday,
+      selectedStateKey: selectedStateKey ?? this.selectedStateKey,
       messageId: messageId ?? this.messageId,
       message: message ?? this.message,
       zodiacHint: zodiacHint ?? this.zodiacHint,
@@ -48,6 +53,7 @@ class DailyRevealRecord {
     return {
       'dateKey': dateKey,
       'hasRevealedToday': hasRevealedToday,
+      'selectedStateKey': selectedStateKey,
       'messageId': messageId,
       'message': message,
       'zodiacHint': zodiacHint,
@@ -59,6 +65,7 @@ class DailyRevealRecord {
     return DailyRevealRecord(
       dateKey: (json['dateKey'] as String?) ?? '',
       hasRevealedToday: (json['hasRevealedToday'] as bool?) ?? false,
+      selectedStateKey: (json['selectedStateKey'] as String?) ?? '',
       messageId: (json['messageId'] as String?) ?? '',
       message: (json['message'] as String?) ?? '',
       zodiacHint: (json['zodiacHint'] as String?) ?? '',
