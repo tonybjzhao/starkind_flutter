@@ -12,6 +12,7 @@ import '../models/user_profile.dart';
 import 'entitlement_service.dart';
 import 'message_service.dart';
 import 'notification_service.dart';
+import 'premium_purchase_service.dart';
 import 'zodiac_service.dart';
 
 class StarKindState extends ChangeNotifier {
@@ -20,10 +21,13 @@ class StarKindState extends ChangeNotifier {
     ZodiacService? zodiacService,
     NotificationService? notificationService,
     EntitlementService? entitlementService,
-  })  : _messageService = messageService ?? MessageService(),
-        _zodiacService = zodiacService ?? ZodiacService(),
-        _notificationService = notificationService ?? NotificationService(),
-        _entitlementService = entitlementService ?? const EntitlementService() {
+    PremiumPurchaseService? premiumPurchaseService,
+  }) : _messageService = messageService ?? MessageService(),
+       _zodiacService = zodiacService ?? ZodiacService(),
+       _notificationService = notificationService ?? NotificationService(),
+       _entitlementService = entitlementService ?? const EntitlementService(),
+       _premiumPurchaseService =
+           premiumPurchaseService ?? PremiumPurchaseService() {
     refreshDailyMessage();
   }
 
@@ -31,6 +35,7 @@ class StarKindState extends ChangeNotifier {
   final ZodiacService _zodiacService;
   final NotificationService _notificationService;
   final EntitlementService _entitlementService;
+  final PremiumPurchaseService _premiumPurchaseService;
 
   static const String _profileKey = 'profile';
   static const String _savedMessagesKey = 'saved_messages';
@@ -42,11 +47,13 @@ class StarKindState extends ChangeNotifier {
   UserProfile _profile = UserProfile.initial();
   DailyMessage? _currentMessage;
   final List<DailyMessage> _savedMessages = [];
-  DailyRevealRecord _dailyRevealRecord =
-      DailyRevealRecord.emptyFor(_todayKey());
+  DailyRevealRecord _dailyRevealRecord = DailyRevealRecord.emptyFor(
+    _todayKey(),
+  );
   int _streakCount = 0;
   String _lastRevealDate = '';
   bool _isPremiumEnabled = false;
+  bool _purchaseInProgress = false;
   bool _notificationsReady = false;
 
   UserProfile get profile => _profile;
@@ -56,6 +63,7 @@ class StarKindState extends ChangeNotifier {
       DailyStateX.fromKey(_dailyRevealRecord.selectedStateKey);
   bool get canRevealToday => selectedDailyState != null;
   bool get isPremiumEnabled => _isPremiumEnabled;
+  bool get purchaseInProgress => _purchaseInProgress;
   int get currentStreak => _streakCount;
   String get streakMessage {
     if (_streakCount <= 0) {
@@ -69,6 +77,7 @@ class StarKindState extends ChangeNotifier {
     }
     return 'Beautiful consistency. Keep honoring your pace.';
   }
+
   List<DailyState> get availableDailyStates =>
       _entitlementService.availableStates(isPremium: _isPremiumEnabled);
 
@@ -78,6 +87,7 @@ class StarKindState extends ChangeNotifier {
       isPremium: _isPremiumEnabled,
     );
   }
+
   String get todayDateText => _dailyRevealRecord.dateKey;
   UnmodifiableListView<DailyMessage> get savedMessages =>
       UnmodifiableListView(_savedMessages);
@@ -124,21 +134,62 @@ class StarKindState extends ChangeNotifier {
     _syncTodayRecordAndMessage(notify: true);
   }
 
-  void setPremiumEnabled(bool enabled) {
-    if (_isPremiumEnabled == enabled) {
-      return;
+  Future<PurchaseActionResult> purchasePremium() async {
+    if (_isPremiumEnabled) {
+      return const PurchaseActionResult.success();
     }
-    _isPremiumEnabled = enabled;
-    unawaited(_savePremiumEnabled());
-    _syncTodayRecordAndMessage(notify: true);
+
+    _purchaseInProgress = true;
+    notifyListeners();
+
+    try {
+      final offer = await _premiumPurchaseService.loadPremiumOffer();
+      if (!offer.isAvailable || offer.product == null) {
+        return PurchaseActionResult.failed(
+          message: offer.message ?? 'Premium is currently unavailable.',
+        );
+      }
+
+      final purchaseResult = await _premiumPurchaseService.purchasePremium(
+        product: offer.product!,
+      );
+      if (!purchaseResult.isSuccess) {
+        return purchaseResult;
+      }
+
+      await _setPremiumEnabled(true);
+      return purchaseResult;
+    } finally {
+      _purchaseInProgress = false;
+      notifyListeners();
+    }
+  }
+
+  Future<PurchaseActionResult> restorePremiumPurchase() async {
+    if (_isPremiumEnabled) {
+      return const PurchaseActionResult.success(restored: true);
+    }
+
+    _purchaseInProgress = true;
+    notifyListeners();
+
+    try {
+      final restoreResult = await _premiumPurchaseService.restorePremium();
+      if (!restoreResult.isSuccess) {
+        return restoreResult;
+      }
+
+      await _setPremiumEnabled(true);
+      return restoreResult;
+    } finally {
+      _purchaseInProgress = false;
+      notifyListeners();
+    }
   }
 
   void setBirthday(DateTime birthday) {
     final zodiac = _zodiacService.getZodiacSign(birthday);
-    _profile = _profile.copyWith(
-      birthday: birthday,
-      zodiacSign: zodiac,
-    );
+    _profile = _profile.copyWith(birthday: birthday, zodiacSign: zodiac);
     _saveProfile();
     _syncTodayRecordAndMessage(notify: true);
     unawaited(_rescheduleNotification());
@@ -285,12 +336,22 @@ class StarKindState extends ChangeNotifier {
     await prefs.setBool(_premiumEnabledKey, _isPremiumEnabled);
   }
 
+  Future<void> _setPremiumEnabled(bool enabled) async {
+    if (_isPremiumEnabled == enabled) {
+      return;
+    }
+    _isPremiumEnabled = enabled;
+    await _savePremiumEnabled();
+    _syncTodayRecordAndMessage(notify: true);
+  }
+
   Future<void> _rescheduleNotification() async {
     if (!_notificationsReady) {
       return;
     }
 
-    final body = _currentMessage?.message ??
+    final body =
+        _currentMessage?.message ??
         'Your gentle StarKind message is ready for today.';
 
     await _notificationService.scheduleDailyMessageNotification(
@@ -428,8 +489,7 @@ class StarKindScope extends InheritedNotifier<StarKindState> {
   }) : super(notifier: notifier);
 
   static StarKindState of(BuildContext context) {
-    final scope =
-        context.dependOnInheritedWidgetOfExactType<StarKindScope>();
+    final scope = context.dependOnInheritedWidgetOfExactType<StarKindScope>();
     if (scope == null || scope.notifier == null) {
       throw FlutterError('StarKindScope not found in widget tree.');
     }

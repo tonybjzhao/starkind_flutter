@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/starkind_state.dart';
+import '../widgets/premium_paywall_sheet.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -58,6 +59,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return '$mm/$dd/${date.year}';
   }
 
+  Future<void> _openPremiumPaywall() async {
+    final message = await showPremiumPaywallSheet(context);
+    if (!mounted || message == null) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  Future<void> _restorePurchase() async {
+    final state = StarKindScope.of(context);
+    final result = await state.restorePremiumPurchase();
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.isSuccess
+              ? 'Premium restored.'
+              : (result.message ?? 'No purchase found to restore.'),
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = StarKindScope.of(context);
@@ -75,24 +104,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Text(
             'Profile',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF6F5E5E),
-                ),
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF6F5E5E),
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Your gentle profile',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF7A6970),
-                ),
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF7A6970),
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             'Set your birthday and preferences for your daily StarKind message.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: const Color(0xFF8A7A7A),
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: const Color(0xFF8A7A7A)),
           ),
           const SizedBox(height: 20),
           Card(
@@ -104,8 +133,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Text(
                     'Birthday',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -128,7 +157,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.all(18),
               child: Row(
                 children: [
-                  const Icon(Icons.auto_awesome_rounded, color: Color(0xFF6F5E5E)),
+                  const Icon(
+                    Icons.auto_awesome_rounded,
+                    color: Color(0xFF6F5E5E),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -141,7 +173,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(height: 4),
                         Text(
                           zodiacSign,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: const Color(0xFF6F5E5E),
                               ),
@@ -163,8 +196,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Text(
                     'Daily notification time',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -191,8 +224,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Text(
                     'Style preference',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -224,25 +257,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Text(
                     'Plan',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     state.isPremiumEnabled
-                        ? 'Premium feelings enabled'
-                        : 'Free plan active.',
+                        ? 'Premium active'
+                        : 'Free plan active',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
-                  const SizedBox(height: 10),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Enable Premium feelings'),
-                    subtitle: const Text(
-                      'Unlock overwhelmed, lonely, drained, grateful, and brave.',
+                  const SizedBox(height: 8),
+                  Text(
+                    'Unlock overwhelmed, lonely, drained, grateful, and brave.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF87757D),
                     ),
-                    value: state.isPremiumEnabled,
-                    onChanged: state.setPremiumEnabled,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: state.purchaseInProgress
+                          ? null
+                          : _openPremiumPaywall,
+                      icon: const Icon(Icons.stars_rounded),
+                      label: const Text('Unlock Premium'),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: state.purchaseInProgress
+                          ? null
+                          : _restorePurchase,
+                      icon: const Icon(Icons.restore_rounded),
+                      label: const Text('Restore Purchase'),
+                    ),
                   ),
                 ],
               ),

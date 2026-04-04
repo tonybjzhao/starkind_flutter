@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/daily_state.dart';
 import '../services/starkind_state.dart';
 import '../widgets/daily_message_card.dart';
+import '../widgets/premium_paywall_sheet.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -14,10 +15,11 @@ class HomeScreen extends StatelessWidget {
     final isRevealed = state.hasRevealedToday;
     final selectedState = state.selectedDailyState;
 
-    final messageText = card?.message ??
+    final messageText =
+        card?.message ??
         'Set your birthday in Profile to receive your daily kindness card.';
-    final hintText = card?.zodiacHint ??
-        'Your zodiac hint will appear after profile setup.';
+    final hintText =
+        card?.zodiacHint ?? 'Your zodiac hint will appear after profile setup.';
     final luckyColor = card?.luckyColor ?? 'Soft Pearl';
     final dateText = state.todayDateText;
 
@@ -37,7 +39,8 @@ class HomeScreen extends StatelessWidget {
                       children: [
                         Text(
                           'StarKind',
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: const Color(0xFF665560),
                               ),
@@ -45,9 +48,8 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(height: 8),
                         Text(
                           'A gentle daily kindness based on your zodiac story.',
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                color: const Color(0xFF85757F),
-                              ),
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(color: const Color(0xFF85757F)),
                         ),
                         const SizedBox(height: 26),
                         _StreakPanel(
@@ -61,17 +63,21 @@ class HomeScreen extends StatelessWidget {
                           isPremium: state.isPremiumEnabled,
                           isUnlocked: state.isDailyStateUnlocked,
                           onSelected: (dailyState) {
-                            final ok = state.selectDailyState(dailyState);
-                            if (!ok) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'This feeling is part of Premium. Enable Premium in Profile to unlock it.',
-                                  ),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
+                            state.selectDailyState(dailyState);
+                          },
+                          onLockedSelected: (_) async {
+                            final message = await showPremiumPaywallSheet(
+                              context,
+                            );
+                            if (message == null || !context.mounted) {
+                              return;
                             }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(message),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
                           },
                         ),
                         const SizedBox(height: 14),
@@ -83,8 +89,10 @@ class HomeScreen extends StatelessWidget {
                             return FadeTransition(
                               opacity: animation,
                               child: ScaleTransition(
-                                scale: Tween<double>(begin: 0.98, end: 1.0)
-                                    .animate(animation),
+                                scale: Tween<double>(
+                                  begin: 0.98,
+                                  end: 1.0,
+                                ).animate(animation),
                                 child: child,
                               ),
                             );
@@ -105,9 +113,13 @@ class HomeScreen extends StatelessWidget {
                                   onTap: () {
                                     final revealed = state.revealTodayMessage();
                                     if (!revealed) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         const SnackBar(
-                                          content: Text('Select how you feel first.'),
+                                          content: Text(
+                                            'Select how you feel first.',
+                                          ),
                                           behavior: SnackBarBehavior.floating,
                                         ),
                                       );
@@ -128,16 +140,20 @@ class HomeScreen extends StatelessWidget {
                                     final saved = state.saveCurrentMessage();
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text(saved
-                                            ? 'Saved to favorites.'
-                                            : 'Already saved for today.'),
+                                        content: Text(
+                                          saved
+                                              ? 'Saved to favorites.'
+                                              : 'Already saved for today.',
+                                        ),
                                         behavior: SnackBarBehavior.floating,
                                       ),
                                     );
                                   },
-                                  icon: Icon(state.isCurrentMessageSaved
-                                      ? Icons.bookmark_rounded
-                                      : Icons.bookmark_add_rounded),
+                                  icon: Icon(
+                                    state.isCurrentMessageSaved
+                                        ? Icons.bookmark_rounded
+                                        : Icons.bookmark_add_rounded,
+                                  ),
                                   label: Text(
                                     state.isCurrentMessageSaved
                                         ? 'Saved'
@@ -193,10 +209,10 @@ class _RevealPlaceholderCard extends StatelessWidget {
               Text(
                 dateText,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      letterSpacing: 0.3,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF8D7A83),
-                    ),
+                  letterSpacing: 0.3,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF8D7A83),
+                ),
               ),
               const SizedBox(height: 16),
               Text(
@@ -204,9 +220,9 @@ class _RevealPlaceholderCard extends StatelessWidget {
                     ? 'Tap to reveal your message'
                     : 'Choose your feeling first',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: const Color(0xFF5F4F59),
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: const Color(0xFF5F4F59),
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -214,17 +230,17 @@ class _RevealPlaceholderCard extends StatelessWidget {
                     ? 'Take a breath, then open today\'s gentle card.'
                     : 'Pick your current state to tune today\'s message.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF7B6A73),
-                    ),
+                  color: const Color(0xFF7B6A73),
+                ),
               ),
               if (selectedStateLabel != null) ...[
                 const SizedBox(height: 12),
                 Text(
                   'Today\'s state: $selectedStateLabel',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: const Color(0xFF6F5E5E),
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: const Color(0xFF6F5E5E),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ],
@@ -242,6 +258,7 @@ class _DailyStateSelector extends StatelessWidget {
     required this.isPremium,
     required this.isUnlocked,
     required this.onSelected,
+    required this.onLockedSelected,
   });
 
   final DailyState? selected;
@@ -249,6 +266,7 @@ class _DailyStateSelector extends StatelessWidget {
   final bool isPremium;
   final bool Function(DailyState state) isUnlocked;
   final ValueChanged<DailyState> onSelected;
+  final ValueChanged<DailyState> onLockedSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -261,9 +279,9 @@ class _DailyStateSelector extends StatelessWidget {
             Text(
               'Choose how you\'re feeling today',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF5F4F59),
-                  ),
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF5F4F59),
+              ),
             ),
             const SizedBox(height: 10),
             if (!isPremium)
@@ -272,32 +290,38 @@ class _DailyStateSelector extends StatelessWidget {
                 child: Text(
                   'Some deeper states are part of Premium.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF85757F),
-                      ),
+                    color: const Color(0xFF85757F),
+                  ),
                 ),
               ),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: DailyState.values
-                  .map((mood) {
-                    final unlocked = isUnlocked(mood);
-                    return ChoiceChip(
-                      label: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(mood.label),
-                          if (!unlocked) ...[
-                            const SizedBox(width: 4),
-                            const Icon(Icons.lock_outline_rounded, size: 14),
-                          ],
-                        ],
-                      ),
-                      selected: selected == mood,
-                      onSelected: enabled ? (_) => onSelected(mood) : null,
-                    );
-                  })
-                  .toList(),
+              children: DailyState.values.map((mood) {
+                final unlocked = isUnlocked(mood);
+                return ChoiceChip(
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(mood.label),
+                      if (!unlocked) ...[
+                        const SizedBox(width: 4),
+                        const Icon(Icons.lock_outline_rounded, size: 14),
+                      ],
+                    ],
+                  ),
+                  selected: selected == mood,
+                  onSelected: enabled
+                      ? (_) {
+                          if (unlocked) {
+                            onSelected(mood);
+                            return;
+                          }
+                          onLockedSelected(mood);
+                        }
+                      : null,
+                );
+              }).toList(),
             ),
           ],
         ),
@@ -307,10 +331,7 @@ class _DailyStateSelector extends StatelessWidget {
 }
 
 class _StreakPanel extends StatelessWidget {
-  const _StreakPanel({
-    required this.streak,
-    required this.message,
-  });
+  const _StreakPanel({required this.streak, required this.message});
 
   final int streak;
   final String message;
@@ -335,16 +356,16 @@ class _StreakPanel extends StatelessWidget {
                   Text(
                     'Kindness streak: $streak $unit',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF5F4F59),
-                        ),
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF5F4F59),
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     message,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF7B6A73),
-                        ),
+                      color: const Color(0xFF7B6A73),
+                    ),
                   ),
                 ],
               ),
@@ -366,11 +387,7 @@ class _PastelBackground extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFFF8EEF3),
-            Color(0xFFF8F4EF),
-            Color(0xFFEEF6FA),
-          ],
+          colors: [Color(0xFFF8EEF3), Color(0xFFF8F4EF), Color(0xFFEEF6FA)],
         ),
       ),
       child: Stack(
