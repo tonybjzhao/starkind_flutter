@@ -31,20 +31,37 @@ class StarKindState extends ChangeNotifier {
   static const String _profileKey = 'profile';
   static const String _savedMessagesKey = 'saved_messages';
   static const String _dailyRevealKey = 'daily_reveal_record';
+  static const String _streakCountKey = 'streak_count';
+  static const String _lastRevealDateKey = 'last_reveal_date';
 
   UserProfile _profile = UserProfile.initial();
   DailyMessage? _currentMessage;
   final List<DailyMessage> _savedMessages = [];
   DailyRevealRecord _dailyRevealRecord =
       DailyRevealRecord.emptyFor(_todayKey());
+  int _streakCount = 0;
+  String _lastRevealDate = '';
   bool _notificationsReady = false;
 
   UserProfile get profile => _profile;
   DailyMessage? get currentMessage => _currentMessage;
   bool get hasRevealedToday => _dailyRevealRecord.hasRevealedToday;
-    DailyState? get selectedDailyState =>
+  DailyState? get selectedDailyState =>
       DailyStateX.fromKey(_dailyRevealRecord.selectedStateKey);
-    bool get canRevealToday => selectedDailyState != null;
+  bool get canRevealToday => selectedDailyState != null;
+  int get currentStreak => _streakCount;
+  String get streakMessage {
+    if (_streakCount <= 0) {
+      return 'Start your gentle rhythm today.';
+    }
+    if (_streakCount < 3) {
+      return 'Small steps count. You are building consistency.';
+    }
+    if (_streakCount < 7) {
+      return 'A kind routine is taking root.';
+    }
+    return 'Beautiful consistency. Keep honoring your pace.';
+  }
   String get todayDateText => _dailyRevealRecord.dateKey;
   UnmodifiableListView<DailyMessage> get savedMessages =>
       UnmodifiableListView(_savedMessages);
@@ -65,6 +82,8 @@ class StarKindState extends ChangeNotifier {
     final profileJson = prefs.getString(_profileKey);
     final savedJson = prefs.getStringList(_savedMessagesKey) ?? [];
     final revealJson = prefs.getString(_dailyRevealKey);
+    _streakCount = prefs.getInt(_streakCountKey) ?? 0;
+    _lastRevealDate = prefs.getString(_lastRevealDateKey) ?? '';
 
     if (profileJson != null && profileJson.isNotEmpty) {
       final decoded = jsonDecode(profileJson) as Map<String, dynamic>;
@@ -173,7 +192,9 @@ class StarKindState extends ChangeNotifier {
     }
 
     _dailyRevealRecord = _dailyRevealRecord.copyWith(hasRevealedToday: true);
+    _updateStreakForReveal(_todayKey());
     unawaited(_saveDailyRevealRecord());
+    unawaited(_saveStreak());
     notifyListeners();
     return true;
   }
@@ -222,6 +243,12 @@ class StarKindState extends ChangeNotifier {
     );
   }
 
+  Future<void> _saveStreak() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_streakCountKey, _streakCount);
+    await prefs.setString(_lastRevealDateKey, _lastRevealDate);
+  }
+
   Future<void> _rescheduleNotification() async {
     if (!_notificationsReady) {
       return;
@@ -239,6 +266,8 @@ class StarKindState extends ChangeNotifier {
 
   void _syncTodayRecordAndMessage({required bool notify}) {
     final todayKey = _todayKey();
+    _normalizeStreakForToday(todayKey);
+
     if (_dailyRevealRecord.dateKey != todayKey) {
       _dailyRevealRecord = DailyRevealRecord.emptyFor(todayKey);
     }
@@ -310,6 +339,46 @@ class StarKindState extends ChangeNotifier {
     } catch (_) {
       return DateTime.now();
     }
+  }
+
+  void _updateStreakForReveal(String todayKey) {
+    if (_lastRevealDate == todayKey) {
+      return;
+    }
+
+    if (_lastRevealDate.isEmpty) {
+      _streakCount = 1;
+      _lastRevealDate = todayKey;
+      return;
+    }
+
+    final dayGap = _daysBetween(_lastRevealDate, todayKey);
+    if (dayGap == 1) {
+      _streakCount += 1;
+    } else {
+      _streakCount = 1;
+    }
+    _lastRevealDate = todayKey;
+  }
+
+  void _normalizeStreakForToday(String todayKey) {
+    if (_lastRevealDate.isEmpty || _streakCount == 0) {
+      return;
+    }
+
+    final dayGap = _daysBetween(_lastRevealDate, todayKey);
+    if (dayGap > 1) {
+      _streakCount = 0;
+      unawaited(_saveStreak());
+    }
+  }
+
+  int _daysBetween(String fromKey, String toKey) {
+    final from = _dateFromKey(fromKey);
+    final to = _dateFromKey(toKey);
+    final fromDate = DateTime(from.year, from.month, from.day);
+    final toDate = DateTime(to.year, to.month, to.day);
+    return toDate.difference(fromDate).inDays;
   }
 }
 

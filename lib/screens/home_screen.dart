@@ -50,6 +50,11 @@ class HomeScreen extends StatelessWidget {
                               ),
                         ),
                         const SizedBox(height: 26),
+                        _StreakPanel(
+                          streak: state.currentStreak,
+                          message: state.streakMessage,
+                        ),
+                        const SizedBox(height: 14),
                         _DailyStateSelector(
                           selected: selectedState,
                           enabled: !isRevealed,
@@ -255,6 +260,56 @@ class _DailyStateSelector extends StatelessWidget {
                     ),
                   )
                   .toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StreakPanel extends StatelessWidget {
+  const _StreakPanel({
+    required this.streak,
+    required this.message,
+  });
+
+  final int streak;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final unit = streak == 1 ? 'day' : 'days';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.local_fire_department_rounded,
+              color: Color(0xFFCE9A89),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Kindness streak: $streak $unit',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF5F4F59),
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    message,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF7B6A73),
+                        ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
