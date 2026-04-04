@@ -60,7 +60,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _openPremiumPaywall() async {
-    final message = await showPremiumPaywallSheet(context);
+    final state = StarKindScope.of(context);
+    final message = await showPremiumPaywallSheet(context, state: state);
     if (!mounted || message == null) {
       return;
     }

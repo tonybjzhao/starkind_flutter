@@ -40,7 +40,7 @@ class PremiumPurchaseService {
     required ProductDetails product,
   }) {
     return _runPurchaseFlow(
-      trigger: () {
+      trigger: () async {
         return _inAppPurchase.buyNonConsumable(
           purchaseParam: PurchaseParam(productDetails: product),
         );
@@ -52,14 +52,17 @@ class PremiumPurchaseService {
 
   Future<PurchaseActionResult> restorePremium() {
     return _runPurchaseFlow(
-      trigger: _inAppPurchase.restorePurchases,
+      trigger: () async {
+        await _inAppPurchase.restorePurchases();
+        return true;
+      },
       allowPurchased: false,
       allowRestored: true,
     );
   }
 
   Future<PurchaseActionResult> _runPurchaseFlow({
-    required Future<void> Function() trigger,
+    required Future<bool> Function() trigger,
     required bool allowPurchased,
     required bool allowRestored,
   }) async {
@@ -121,14 +124,27 @@ class PremiumPurchaseService {
     );
 
     try {
-      await trigger();
+      final started = await trigger().timeout(
+        const Duration(seconds: 12),
+        onTimeout: () => false,
+      );
+      if (!started) {
+        return const PurchaseActionResult.failed(
+          message: 'Unable to start purchase flow right now.',
+        );
+      }
+
       final result = await completer.future.timeout(
-        const Duration(seconds: 45),
+        const Duration(seconds: 60),
         onTimeout: () => const PurchaseActionResult.failed(
           message: 'No purchase confirmation was received.',
         ),
       );
       return result;
+    } catch (_) {
+      return const PurchaseActionResult.failed(
+        message: 'Purchase service is temporarily unavailable.',
+      );
     } finally {
       await subscription.cancel();
     }

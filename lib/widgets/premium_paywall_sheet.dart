@@ -2,17 +2,23 @@ import 'package:flutter/material.dart';
 
 import '../services/starkind_state.dart';
 
-Future<String?> showPremiumPaywallSheet(BuildContext context) {
+Future<String?> showPremiumPaywallSheet(
+  BuildContext context, {
+  required StarKindState state,
+}) {
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => const _PremiumPaywallSheet(),
+    builder: (_) => _PremiumPaywallSheet(state: state),
   );
 }
 
 class _PremiumPaywallSheet extends StatefulWidget {
-  const _PremiumPaywallSheet();
+  const _PremiumPaywallSheet({required this.state});
+
+  final StarKindState state;
 
   @override
   State<_PremiumPaywallSheet> createState() => _PremiumPaywallSheetState();
@@ -26,21 +32,36 @@ class _PremiumPaywallSheetState extends State<_PremiumPaywallSheet> {
       return;
     }
     setState(() => _busy = true);
-    final result = await state.purchasePremium();
-    if (!mounted) {
-      return;
+    try {
+      final result = await state.purchasePremium();
+      if (!mounted) {
+        return;
+      }
+      if (result.isSuccess) {
+        Navigator.of(context).pop('Premium unlocked.');
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message ?? 'Purchase failed.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Purchase failed. Please try again.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
-    setState(() => _busy = false);
-    if (result.isSuccess) {
-      Navigator.of(context).pop('Premium unlocked.');
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(result.message ?? 'Purchase failed.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
   }
 
   Future<void> _handleRestore(StarKindState state) async {
@@ -48,33 +69,48 @@ class _PremiumPaywallSheetState extends State<_PremiumPaywallSheet> {
       return;
     }
     setState(() => _busy = true);
-    final result = await state.restorePremiumPurchase();
-    if (!mounted) {
-      return;
+    try {
+      final result = await state.restorePremiumPurchase();
+      if (!mounted) {
+        return;
+      }
+      if (result.isSuccess) {
+        Navigator.of(context).pop('Premium restored.');
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message ?? 'No purchase found to restore.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Restore failed. Please try again.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
-    setState(() => _busy = false);
-    if (result.isSuccess) {
-      Navigator.of(context).pop('Premium restored.');
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(result.message ?? 'No purchase found to restore.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = StarKindScope.of(context);
     final media = MediaQuery.of(context);
-    final planLine = state.isPremiumEnabled
+    final bottomInset = media.viewInsets.bottom + media.viewPadding.bottom;
+    final planLine = widget.state.isPremiumEnabled
         ? 'Premium active'
         : 'Free plan active';
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + media.viewInsets.bottom),
+      padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottomInset),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: const Color(0xFFFFFCFB),
@@ -130,7 +166,7 @@ class _PremiumPaywallSheetState extends State<_PremiumPaywallSheet> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: _busy ? null : () => _handleUnlock(state),
+                  onPressed: _busy ? null : () => _handleUnlock(widget.state),
                   icon: _busy
                       ? const SizedBox(
                           width: 16,
@@ -145,11 +181,33 @@ class _PremiumPaywallSheetState extends State<_PremiumPaywallSheet> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: _busy ? null : () => _handleRestore(state),
+                  onPressed: _busy ? null : () => _handleRestore(widget.state),
                   icon: const Icon(Icons.restore_rounded),
                   label: const Text('Restore Purchase'),
                 ),
               ),
+              if (_busy) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Contacting the App Store. This can take a few moments.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFF85747C),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

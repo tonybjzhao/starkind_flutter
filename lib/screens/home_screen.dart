@@ -68,6 +68,7 @@ class HomeScreen extends StatelessWidget {
                           onLockedSelected: (_) async {
                             final message = await showPremiumPaywallSheet(
                               context,
+                              state: state,
                             );
                             if (message == null || !context.mounted) {
                               return;
