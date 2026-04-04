@@ -9,6 +9,7 @@ import '../models/daily_message.dart';
 import '../models/daily_reveal_record.dart';
 import '../models/daily_state.dart';
 import '../models/user_profile.dart';
+import 'entitlement_service.dart';
 import 'message_service.dart';
 import 'notification_service.dart';
 import 'zodiac_service.dart';
@@ -18,21 +19,25 @@ class StarKindState extends ChangeNotifier {
     MessageService? messageService,
     ZodiacService? zodiacService,
     NotificationService? notificationService,
+    EntitlementService? entitlementService,
   })  : _messageService = messageService ?? MessageService(),
         _zodiacService = zodiacService ?? ZodiacService(),
-        _notificationService = notificationService ?? NotificationService() {
+        _notificationService = notificationService ?? NotificationService(),
+        _entitlementService = entitlementService ?? const EntitlementService() {
     refreshDailyMessage();
   }
 
   final MessageService _messageService;
   final ZodiacService _zodiacService;
   final NotificationService _notificationService;
+  final EntitlementService _entitlementService;
 
   static const String _profileKey = 'profile';
   static const String _savedMessagesKey = 'saved_messages';
   static const String _dailyRevealKey = 'daily_reveal_record';
   static const String _streakCountKey = 'streak_count';
   static const String _lastRevealDateKey = 'last_reveal_date';
+  static const String _premiumEnabledKey = 'premium_enabled';
 
   UserProfile _profile = UserProfile.initial();
   DailyMessage? _currentMessage;
@@ -41,6 +46,7 @@ class StarKindState extends ChangeNotifier {
       DailyRevealRecord.emptyFor(_todayKey());
   int _streakCount = 0;
   String _lastRevealDate = '';
+  bool _isPremiumEnabled = false;
   bool _notificationsReady = false;
 
   UserProfile get profile => _profile;
@@ -49,6 +55,7 @@ class StarKindState extends ChangeNotifier {
   DailyState? get selectedDailyState =>
       DailyStateX.fromKey(_dailyRevealRecord.selectedStateKey);
   bool get canRevealToday => selectedDailyState != null;
+  bool get isPremiumEnabled => _isPremiumEnabled;
   int get currentStreak => _streakCount;
   String get streakMessage {
     if (_streakCount <= 0) {
@@ -61,6 +68,15 @@ class StarKindState extends ChangeNotifier {
       return 'A kind routine is taking root.';
     }
     return 'Beautiful consistency. Keep honoring your pace.';
+  }
+  List<DailyState> get availableDailyStates =>
+      _entitlementService.availableStates(isPremium: _isPremiumEnabled);
+
+  bool isDailyStateUnlocked(DailyState state) {
+    return _entitlementService.isStateUnlocked(
+      state: state,
+      isPremium: _isPremiumEnabled,
+    );
   }
   String get todayDateText => _dailyRevealRecord.dateKey;
   UnmodifiableListView<DailyMessage> get savedMessages =>
@@ -84,6 +100,7 @@ class StarKindState extends ChangeNotifier {
     final revealJson = prefs.getString(_dailyRevealKey);
     _streakCount = prefs.getInt(_streakCountKey) ?? 0;
     _lastRevealDate = prefs.getString(_lastRevealDateKey) ?? '';
+    _isPremiumEnabled = prefs.getBool(_premiumEnabledKey) ?? false;
 
     if (profileJson != null && profileJson.isNotEmpty) {
       final decoded = jsonDecode(profileJson) as Map<String, dynamic>;
@@ -104,6 +121,15 @@ class StarKindState extends ChangeNotifier {
       _dailyRevealRecord = DailyRevealRecord.fromJson(decoded);
     }
 
+    _syncTodayRecordAndMessage(notify: true);
+  }
+
+  void setPremiumEnabled(bool enabled) {
+    if (_isPremiumEnabled == enabled) {
+      return;
+    }
+    _isPremiumEnabled = enabled;
+    unawaited(_savePremiumEnabled());
     _syncTodayRecordAndMessage(notify: true);
   }
 
@@ -159,14 +185,18 @@ class StarKindState extends ChangeNotifier {
     unawaited(_rescheduleNotification());
   }
 
-  void selectDailyState(DailyState selectedState) {
+  bool selectDailyState(DailyState selectedState) {
+    if (!isDailyStateUnlocked(selectedState)) {
+      return false;
+    }
+
     final todayKey = _todayKey();
     if (_dailyRevealRecord.dateKey != todayKey) {
       _dailyRevealRecord = DailyRevealRecord.emptyFor(todayKey);
     }
 
     if (_dailyRevealRecord.hasRevealedToday) {
-      return;
+      return false;
     }
 
     final generated = _generateTodayMessage(selectedState: selectedState);
@@ -184,6 +214,7 @@ class StarKindState extends ChangeNotifier {
     unawaited(_saveDailyRevealRecord());
     notifyListeners();
     unawaited(_rescheduleNotification());
+    return true;
   }
 
   bool revealTodayMessage() {
@@ -249,6 +280,11 @@ class StarKindState extends ChangeNotifier {
     await prefs.setString(_lastRevealDateKey, _lastRevealDate);
   }
 
+  Future<void> _savePremiumEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_premiumEnabledKey, _isPremiumEnabled);
+  }
+
   Future<void> _rescheduleNotification() async {
     if (!_notificationsReady) {
       return;
@@ -273,9 +309,10 @@ class StarKindState extends ChangeNotifier {
     }
 
     final selected = selectedDailyState;
-    if (selected == null) {
+    if (selected == null || !isDailyStateUnlocked(selected)) {
       _currentMessage = null;
       _dailyRevealRecord = _dailyRevealRecord.copyWith(
+        selectedStateKey: '',
         hasRevealedToday: false,
         messageId: '',
         message: '',
@@ -323,6 +360,7 @@ class StarKindState extends ChangeNotifier {
       zodiacSign: _profile.zodiacSign,
       preferredTone: _profile.preferredTone,
       selectedState: selectedState,
+      isPremium: _isPremiumEnabled,
     );
   }
 

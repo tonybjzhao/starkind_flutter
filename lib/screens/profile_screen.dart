@@ -206,6 +206,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 14),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Plan',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    state.isPremiumEnabled
+                        ? 'Premium enabled (local demo mode).'
+                        : 'Free plan active.',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 10),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Enable Premium feelings'),
+                    subtitle: const Text(
+                      'Unlock overwhelmed, lonely, drained, grateful, and brave.',
+                    ),
+                    value: state.isPremiumEnabled,
+                    onChanged: state.setPremiumEnabled,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

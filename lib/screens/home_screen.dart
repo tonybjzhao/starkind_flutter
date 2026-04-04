@@ -58,7 +58,21 @@ class HomeScreen extends StatelessWidget {
                         _DailyStateSelector(
                           selected: selectedState,
                           enabled: !isRevealed,
-                          onSelected: state.selectDailyState,
+                          isPremium: state.isPremiumEnabled,
+                          isUnlocked: state.isDailyStateUnlocked,
+                          onSelected: (dailyState) {
+                            final ok = state.selectDailyState(dailyState);
+                            if (!ok) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'This feeling is part of Premium. Enable Premium in Profile to unlock it.',
+                                  ),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          },
                         ),
                         const SizedBox(height: 14),
                         AnimatedSwitcher(
@@ -225,11 +239,15 @@ class _DailyStateSelector extends StatelessWidget {
   const _DailyStateSelector({
     required this.selected,
     required this.enabled,
+    required this.isPremium,
+    required this.isUnlocked,
     required this.onSelected,
   });
 
   final DailyState? selected;
   final bool enabled;
+  final bool isPremium;
+  final bool Function(DailyState state) isUnlocked;
   final ValueChanged<DailyState> onSelected;
 
   @override
@@ -248,17 +266,37 @@ class _DailyStateSelector extends StatelessWidget {
                   ),
             ),
             const SizedBox(height: 10),
+            if (!isPremium)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Free: Calm, Tired, Anxious, Hopeful. Other feelings are Premium.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF85757F),
+                      ),
+                ),
+              ),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: DailyState.values
-                  .map(
-                    (mood) => ChoiceChip(
-                      label: Text(mood.label),
+                  .map((mood) {
+                    final unlocked = isUnlocked(mood);
+                    return ChoiceChip(
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(mood.label),
+                          if (!unlocked) ...[
+                            const SizedBox(width: 4),
+                            const Icon(Icons.lock_outline_rounded, size: 14),
+                          ],
+                        ],
+                      ),
                       selected: selected == mood,
                       onSelected: enabled ? (_) => onSelected(mood) : null,
-                    ),
-                  )
+                    );
+                  })
                   .toList(),
             ),
           ],
