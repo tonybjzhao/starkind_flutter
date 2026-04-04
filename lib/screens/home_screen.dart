@@ -10,15 +10,14 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = StarKindScope.of(context);
     final card = state.currentMessage;
+    final isRevealed = state.hasRevealedToday;
 
     final messageText = card?.message ??
         'Set your birthday in Profile to receive your daily kindness card.';
     final hintText = card?.zodiacHint ??
         'Your zodiac hint will appear after profile setup.';
     final luckyColor = card?.luckyColor ?? 'Soft Pearl';
-    final dateText = card == null
-        ? 'TODAY'
-        : '${card.date.year}-${card.date.month.toString().padLeft(2, '0')}-${card.date.day.toString().padLeft(2, '0')}';
+    final dateText = state.todayDateText;
 
     return SafeArea(
       child: Stack(
@@ -49,46 +48,71 @@ class HomeScreen extends StatelessWidget {
                               ),
                         ),
                         const SizedBox(height: 26),
-                        DailyMessageCard(
-                          message: messageText,
-                          zodiacHint: hintText,
-                          luckyColor: luckyColor,
-                          dateText: dateText,
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 260),
+                          switchInCurve: Curves.easeOut,
+                          switchOutCurve: Curves.easeIn,
+                          transitionBuilder: (child, animation) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: ScaleTransition(
+                                scale: Tween<double>(begin: 0.98, end: 1.0)
+                                    .animate(animation),
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: isRevealed
+                              ? DailyMessageCard(
+                                  key: const ValueKey('revealed-card'),
+                                  message: messageText,
+                                  zodiacHint: hintText,
+                                  luckyColor: luckyColor,
+                                  dateText: dateText,
+                                )
+                              : _RevealPlaceholderCard(
+                                  key: const ValueKey('hidden-card'),
+                                  dateText: dateText,
+                                  onTap: state.revealTodayMessage,
+                                ),
                         ),
                         const SizedBox(height: 20),
-                        Center(
-                          child: Wrap(
-                            spacing: 12,
-                            runSpacing: 12,
-                            alignment: WrapAlignment.center,
-                            children: [
-                              FilledButton.icon(
-                                onPressed: () {
-                                  final saved = state.saveCurrentMessage();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(saved
-                                          ? 'Saved to favorites.'
-                                          : 'Already saved for today.'),
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
-                                },
-                                icon: Icon(state.isCurrentMessageSaved
-                                    ? Icons.bookmark_rounded
-                                    : Icons.bookmark_add_rounded),
-                                label: Text(
-                                  state.isCurrentMessageSaved ? 'Saved' : 'Save',
+                        if (isRevealed)
+                          Center(
+                            child: Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              alignment: WrapAlignment.center,
+                              children: [
+                                FilledButton.icon(
+                                  onPressed: () {
+                                    final saved = state.saveCurrentMessage();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(saved
+                                            ? 'Saved to favorites.'
+                                            : 'Already saved for today.'),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  },
+                                  icon: Icon(state.isCurrentMessageSaved
+                                      ? Icons.bookmark_rounded
+                                      : Icons.bookmark_add_rounded),
+                                  label: Text(
+                                    state.isCurrentMessageSaved
+                                        ? 'Saved'
+                                        : 'Save',
+                                  ),
                                 ),
-                              ),
-                              OutlinedButton.icon(
-                                onPressed: state.refreshDailyMessage,
-                                icon: const Icon(Icons.refresh_rounded),
-                                label: const Text('Refresh'),
-                              ),
-                            ],
+                                OutlinedButton.icon(
+                                  onPressed: state.refreshDailyMessage,
+                                  icon: const Icon(Icons.refresh_rounded),
+                                  label: const Text('Refresh'),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -97,6 +121,58 @@ class HomeScreen extends StatelessWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RevealPlaceholderCard extends StatelessWidget {
+  const _RevealPlaceholderCard({
+    super.key,
+    required this.dateText,
+    required this.onTap,
+  });
+
+  final String dateText;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                dateText,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      letterSpacing: 0.3,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF8D7A83),
+                    ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Tap to reveal your message',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: const Color(0xFF5F4F59),
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Take a breath, then open today\'s gentle card.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF7B6A73),
+                    ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

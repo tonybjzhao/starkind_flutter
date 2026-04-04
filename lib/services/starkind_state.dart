@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/daily_message.dart';
+import '../models/daily_reveal_record.dart';
 import '../models/user_profile.dart';
 import 'message_service.dart';
 import 'notification_service.dart';
@@ -28,14 +29,19 @@ class StarKindState extends ChangeNotifier {
 
   static const String _profileKey = 'profile';
   static const String _savedMessagesKey = 'saved_messages';
+  static const String _dailyRevealKey = 'daily_reveal_record';
 
   UserProfile _profile = UserProfile.initial();
   DailyMessage? _currentMessage;
   final List<DailyMessage> _savedMessages = [];
+  DailyRevealRecord _dailyRevealRecord =
+      DailyRevealRecord.emptyFor(_todayKey());
   bool _notificationsReady = false;
 
   UserProfile get profile => _profile;
   DailyMessage? get currentMessage => _currentMessage;
+  bool get hasRevealedToday => _dailyRevealRecord.hasRevealedToday;
+  String get todayDateText => _dailyRevealRecord.dateKey;
   UnmodifiableListView<DailyMessage> get savedMessages =>
       UnmodifiableListView(_savedMessages);
   bool get isCurrentMessageSaved {
@@ -54,6 +60,7 @@ class StarKindState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final profileJson = prefs.getString(_profileKey);
     final savedJson = prefs.getStringList(_savedMessagesKey) ?? [];
+    final revealJson = prefs.getString(_dailyRevealKey);
 
     if (profileJson != null && profileJson.isNotEmpty) {
       final decoded = jsonDecode(profileJson) as Map<String, dynamic>;
@@ -69,7 +76,12 @@ class StarKindState extends ChangeNotifier {
         }),
       );
 
-    refreshDailyMessage();
+    if (revealJson != null && revealJson.isNotEmpty) {
+      final decoded = jsonDecode(revealJson) as Map<String, dynamic>;
+      _dailyRevealRecord = DailyRevealRecord.fromJson(decoded);
+    }
+
+    _syncTodayRecordAndMessage(notify: true);
   }
 
   void setBirthday(DateTime birthday) {
@@ -79,14 +91,14 @@ class StarKindState extends ChangeNotifier {
       zodiacSign: zodiac,
     );
     _saveProfile();
-    refreshDailyMessage();
+    _syncTodayRecordAndMessage(notify: true);
     unawaited(_rescheduleNotification());
   }
 
   void setPreferredTone(String tone) {
     _profile = _profile.copyWith(preferredTone: tone);
     _saveProfile();
-    refreshDailyMessage();
+    _syncTodayRecordAndMessage(notify: true);
     unawaited(_rescheduleNotification());
   }
 
@@ -101,14 +113,29 @@ class StarKindState extends ChangeNotifier {
   }
 
   void refreshDailyMessage() {
-    final now = DateTime.now();
-    _currentMessage = _messageService.generateDailyMessage(
-      date: DateTime(now.year, now.month, now.day),
-      zodiacSign: _profile.zodiacSign,
-      preferredTone: _profile.preferredTone,
+    final generated = _generateTodayMessage();
+    _currentMessage = generated;
+    _dailyRevealRecord = DailyRevealRecord(
+      dateKey: _todayKey(),
+      hasRevealedToday: false,
+      messageId: generated.id,
+      message: generated.message,
+      zodiacHint: generated.zodiacHint,
+      luckyColor: generated.luckyColor,
     );
+    unawaited(_saveDailyRevealRecord());
     notifyListeners();
     unawaited(_rescheduleNotification());
+  }
+
+  void revealTodayMessage() {
+    if (_dailyRevealRecord.hasRevealedToday) {
+      return;
+    }
+
+    _dailyRevealRecord = _dailyRevealRecord.copyWith(hasRevealedToday: true);
+    unawaited(_saveDailyRevealRecord());
+    notifyListeners();
   }
 
   bool saveCurrentMessage() {
@@ -147,6 +174,14 @@ class StarKindState extends ChangeNotifier {
     await prefs.setStringList(_savedMessagesKey, encoded);
   }
 
+  Future<void> _saveDailyRevealRecord() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _dailyRevealKey,
+      jsonEncode(_dailyRevealRecord.toJson()),
+    );
+  }
+
   Future<void> _rescheduleNotification() async {
     if (!_notificationsReady) {
       return;
@@ -160,6 +195,61 @@ class StarKindState extends ChangeNotifier {
       minute: _profile.notificationMinute,
       message: body,
     );
+  }
+
+  void _syncTodayRecordAndMessage({required bool notify}) {
+    final todayKey = _todayKey();
+    final generated = _generateTodayMessage();
+
+    if (_dailyRevealRecord.dateKey != todayKey ||
+        _dailyRevealRecord.messageId.isEmpty) {
+      _dailyRevealRecord = DailyRevealRecord(
+        dateKey: todayKey,
+        hasRevealedToday: false,
+        messageId: generated.id,
+        message: generated.message,
+        zodiacHint: generated.zodiacHint,
+        luckyColor: generated.luckyColor,
+      );
+    }
+
+    _currentMessage = DailyMessage(
+      id: _dailyRevealRecord.messageId,
+      date: _dateFromKey(_dailyRevealRecord.dateKey),
+      message: _dailyRevealRecord.message,
+      zodiacHint: _dailyRevealRecord.zodiacHint,
+      luckyColor: _dailyRevealRecord.luckyColor,
+      zodiacSign: _profile.zodiacSign,
+    );
+
+    unawaited(_saveDailyRevealRecord());
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  DailyMessage _generateTodayMessage() {
+    final now = DateTime.now();
+    return _messageService.generateDailyMessage(
+      date: DateTime(now.year, now.month, now.day),
+      zodiacSign: _profile.zodiacSign,
+      preferredTone: _profile.preferredTone,
+    );
+  }
+
+  static String _todayKey() {
+    final now = DateTime.now();
+    final month = now.month.toString().padLeft(2, '0');
+    final day = now.day.toString().padLeft(2, '0');
+    return '${now.year}-$month-$day';
+  }
+
+  DateTime _dateFromKey(String key) {
+    try {
+      return DateTime.parse(key);
+    } catch (_) {
+      return DateTime.now();
+    }
   }
 }
 
