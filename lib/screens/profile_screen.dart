@@ -81,6 +81,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 8),
           Text(
+            'Your gentle profile',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF7A6970),
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text(
             'Set your birthday and preferences for your daily StarKind message.',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: const Color(0xFF8A7A7A),
@@ -222,7 +230,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 8),
                   Text(
                     state.isPremiumEnabled
-                        ? 'Premium enabled (local demo mode).'
+                        ? 'Premium feelings enabled'
                         : 'Free plan active.',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),

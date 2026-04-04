@@ -259,7 +259,7 @@ class _DailyStateSelector extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'How are you feeling today?',
+              'Choose how you\'re feeling today',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: const Color(0xFF5F4F59),
@@ -270,7 +270,7 @@ class _DailyStateSelector extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
-                  'Free: Calm, Tired, Anxious, Hopeful. Other feelings are Premium.',
+                  'Some deeper states are part of Premium.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: const Color(0xFF85757F),
                       ),

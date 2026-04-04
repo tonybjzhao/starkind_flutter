@@ -26,7 +26,7 @@ class SavedScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Keep your favorite daily messages here.',
+              'A quiet place for your gentle moments.',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: const Color(0xFF8A7A7A),
                   ),
