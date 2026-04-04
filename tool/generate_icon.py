@@ -1,52 +1,54 @@
 from PIL import Image, ImageDraw
 
 SIZE = 1024
-img = Image.new('RGBA', (SIZE, SIZE), (247, 241, 245, 255))
-d = ImageDraw.Draw(img, 'RGBA')
 
-# Soft pastel atmosphere.
-d.ellipse((-120, -120, 780, 780), fill=(255, 229, 235, 160))
-d.ellipse((320, 260, 1100, 1040), fill=(222, 239, 248, 180))
-d.ellipse((120, 500, 760, 1140), fill=(246, 224, 202, 150))
+def draw_core(canvas: Image.Image, background: tuple[int, int, int, int]) -> None:
+    d = ImageDraw.Draw(canvas, 'RGBA')
+    d.rectangle((0, 0, SIZE, SIZE), fill=background)
 
-# Elegant rounded badge.
-pad = 130
-d.rounded_rectangle(
-    (pad, pad, SIZE - pad, SIZE - pad),
-    radius=190,
-    fill=(255, 252, 251, 255),
-    outline=(229, 211, 216, 255),
-    width=10,
-)
+    # Artwork fills roughly 85% of the canvas with ~10% safe margin.
+    outer = 100
 
-# Crescent moon + stars.
-d.ellipse((300, 230, 690, 620), fill=(246, 214, 170, 255))
-d.ellipse((375, 230, 740, 620), fill=(255, 252, 251, 255))
-star_color = (112, 91, 110, 255)
-for x, y, r in [(700, 290, 20), (750, 360, 13), (670, 370, 11)]:
-    d.polygon(
-        [
-            (x, y - r),
-            (x + r // 3, y - r // 3),
-            (x + r, y),
-            (x + r // 3, y + r // 3),
-            (x, y + r),
-            (x - r // 3, y + r // 3),
-            (x - r, y),
-            (x - r // 3, y - r // 3),
-        ],
-        fill=star_color,
-    )
+    # Crescent moon.
+    d.ellipse((outer + 160, outer + 120, outer + 540, outer + 500), fill=(240, 210, 160, 255))
+    d.ellipse((outer + 240, outer + 120, outer + 620, outer + 500), fill=background)
 
-# Open kindness card motif.
-d.rounded_rectangle((250, 560, 500, 740), radius=36, fill=(186, 220, 220, 255))
-d.rounded_rectangle((520, 560, 770, 740), radius=36, fill=(221, 170, 155, 255))
-d.polygon([(500, 560), (520, 560), (520, 740), (500, 740)], fill=(245, 233, 236, 255))
+    # Stars.
+    star_color = (112, 91, 110, 255)
+    for x, y, r in [(outer + 640, outer + 180, 24), (outer + 700, outer + 250, 15), (outer + 610, outer + 260, 12)]:
+        d.polygon(
+            [
+                (x, y - r),
+                (x + r // 3, y - r // 3),
+                (x + r, y),
+                (x + r // 3, y + r // 3),
+                (x, y + r),
+                (x - r // 3, y + r // 3),
+                (x - r, y),
+                (x - r // 3, y - r // 3),
+            ],
+            fill=star_color,
+        )
 
-# Heart shape.
-d.pieslice((430, 430, 550, 550), 180, 360, fill=(221, 170, 155, 255))
-d.pieslice((520, 430, 640, 550), 180, 360, fill=(221, 170, 155, 255))
-d.polygon([(430, 490), (640, 490), (535, 625)], fill=(221, 170, 155, 255))
+    # Colored base shapes.
+    d.rounded_rectangle((outer + 110, outer + 460, outer + 400, outer + 650), radius=40, fill=(166, 206, 208, 255))
+    d.rounded_rectangle((outer + 430, outer + 460, outer + 720, outer + 650), radius=40, fill=(213, 163, 146, 255))
+    d.rectangle((outer + 400, outer + 460, outer + 430, outer + 650), fill=background)
 
-img.save('assets/icon/starkind_icon.png')
+    # Heart shape.
+    heart_color = (213, 163, 146, 255)
+    d.pieslice((outer + 310, outer + 315, outer + 430, outer + 435), 180, 360, fill=heart_color)
+    d.pieslice((outer + 410, outer + 315, outer + 530, outer + 435), 180, 360, fill=heart_color)
+    d.polygon([(outer + 310, outer + 375), (outer + 530, outer + 375), (outer + 420, outer + 520)], fill=heart_color)
+
+
+base = Image.new('RGBA', (SIZE, SIZE), (0, 0, 0, 0))
+draw_core(base, (243, 236, 241, 255))
+base.save('assets/icon/starkind_icon.png')
+
+foreground = Image.new('RGBA', (SIZE, SIZE), (0, 0, 0, 0))
+draw_core(foreground, (0, 0, 0, 0))
+foreground.save('assets/icon/starkind_icon_foreground.png')
+
 print('created assets/icon/starkind_icon.png')
+print('created assets/icon/starkind_icon_foreground.png')
