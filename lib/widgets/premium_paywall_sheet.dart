@@ -47,13 +47,15 @@ class _PremiumPaywallSheetState extends State<_PremiumPaywallSheet> {
           behavior: SnackBarBehavior.floating,
         ),
       );
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[IAP] Purchase exception: $e');
+      debugPrint('$st');
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Purchase failed. Please try again.'),
+        SnackBar(
+          content: Text('Purchase failed: $e'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -84,13 +86,15 @@ class _PremiumPaywallSheetState extends State<_PremiumPaywallSheet> {
           behavior: SnackBarBehavior.floating,
         ),
       );
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[IAP] Restore exception: $e');
+      debugPrint('$st');
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Restore failed. Please try again.'),
+        SnackBar(
+          content: Text('Restore failed: $e'),
           behavior: SnackBarBehavior.floating,
         ),
       );
